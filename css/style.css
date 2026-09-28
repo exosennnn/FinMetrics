@@ -1,0 +1,69 @@
+/* css/style.css */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+body {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: #0d0d0d;
+    color: #e5e5e5;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.light-theme {
+    background-color: #f4f4f6;
+    color: #18181b;
+}
+
+body.light-theme .card {
+    background-color: #ffffff;
+    border-color: #e4e4e7;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme input, body.light-theme select {
+    background-color: #f9f9fb !important;
+    border-color: #d4d4d8 !important;
+    color: #18181b !important;
+}
+
+body.light-theme .text-zinc-500 {
+    color: #71717a !important;
+}
+
+.card {
+    background-color: #161618;
+    border: 1px solid #26262a;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Snappy Button Press ("Palo" feeling) */
+button:active {
+    transform: scale(0.94);
+}
+button {
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease;
+}
+
+/* Spring Pop Animation for New Items */
+@keyframes springPop {
+    0% { transform: scale(0.92); opacity: 0; }
+    60% { transform: scale(1.03); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pop {
+    animation: springPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 4px;
+}

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinMetrics - Personal Finance & Analytics System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen py-8 px-4 flex items-center justify-center">
+
+    <div id="app" class="w-full max-w-md space-y-4">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center px-1">
+            <div>
+                <h1 class="text-base font-bold flex items-center gap-2 tracking-wide text-white">
+                    FinMetrics <span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium tracking-wider">CORE</span>
+                </h1>
+                <p class="text-[11px] text-zinc-500">Multi-Wallet, Analytics & Goals</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <button @click="toggleTheme" title="Toggle Theme" class="p-2 rounded-xl bg-zinc-900/40 border border-zinc-800 text-zinc-300 hover:text-white text-xs">
+                    {{ isDarkMode ? '☀️' : '🌙' }}
+                </button>
+                <button @click="exportData" title="Export Backup" class="p-2 rounded-xl bg-zinc-900/40 border border-zinc-800 text-zinc-300 hover:text-white text-xs">
+                    📥
+                </button>
+                <label title="Import Backup" class="p-2 rounded-xl bg-zinc-900/40 border border-zinc-800 text-zinc-300 hover:text-white text-xs cursor-pointer">
+                    📤
+                    <input type="file" @change="importData" accept=".json" class="hidden">
+                </label>
+            </div>
+        </header>
+
+        <!-- Net Worth Card (Highlight) -->
+        <div class="card p-4 rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-900/80 border border-zinc-800 flex justify-between items-center">
+            <div>
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Total Net Worth</span>
+                <span class="text-2xl font-extrabold text-emerald-400 tracking-tight">₱{{ totalNetWorth.toLocaleString() }}</span>
+            </div>
+            <div class="text-right">
+                <span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 font-semibold">
+                    All Wallets Combined
+                </span>
+            </div>
+        </div>
+
+        <!-- Multi-Wallet Overview -->
+        <div class="space-y-1.5">
+            <div class="flex justify-between items-center px-1">
+                <span class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Wallets Overview</span>
+                <span class="text-[9px] text-zinc-600 font-medium">Swipe →</span>
+            </div>
+            
+            <div class="flex gap-2.5 overflow-x-auto pb-2 pt-1 px-1 snap-x snap-mandatory scrollbar-none">
+                <div 
+                    v-for="w in wallets" 
+                    :key="w.id" 
+                    class="card p-3 rounded-2xl min-w-[125px] flex-1 snap-start space-y-1 hover:border-zinc-700 transition-all cursor-pointer"
+                >
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-semibold text-zinc-400 truncate max-w-[80px]">{{ w.name }}</span>
+                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="getWalletDotClass(w.id)"></span>
+                    </div>
+                    
+                    <span 
+                        class="font-bold block tracking-tight truncate text-xs text-white" 
+                        :title="'₱' + getWalletBalance(w.id).toLocaleString()"
+                    >
+                        ₱{{ getWalletBalance(w.id).toLocaleString() }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Month Selector Bar -->
+        <div class="card p-3 rounded-2xl flex justify-between items-center text-xs">
+            <span class="text-zinc-400 font-medium">Active Month:</span>
+            <input 
+                type="month" 
+                v-model="selectedMonth" 
+                class="bg-zinc-900 border border-zinc-700/60 text-white px-3 py-1 rounded-xl text-xs focus:outline-none font-bold"
+            />
+        </div>
+
+        <!-- Monthly Budget Input -->
+        <div class="card p-4 rounded-2xl space-y-2">
+            <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Monthly Budget Limit</label>
+            <div class="relative">
+                <span class="absolute left-3 top-2 text-zinc-500 text-xs">₱</span>
+                <input 
+                    type="text" 
+                    inputmode="decimal"
+                    maxlength="10"
+                    v-model="monthlyBudget" 
+                    @input="monthlyBudget = monthlyBudget.replace(/[^0-9.]/g, '')"
+                    class="w-full pl-7 pr-3 py-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 font-bold text-xs text-white focus:outline-none text-right"
+                />
+            </div>
+        </div>
+
+        <!-- Budget Progress Card -->
+        <div class="card p-5 rounded-2xl space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-zinc-400 uppercase tracking-wider font-semibold text-[10px]">Monthly Budget Status</span>
+                <span class="font-bold px-2 py-0.5 rounded-md text-[11px]" :class="budgetPercentage > 100 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 animate-pulse' : 'bg-zinc-800 text-zinc-300'">
+                    {{ budgetPercentage.toFixed(0) }}% spent
+                </span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-zinc-900 h-2.5 rounded-full overflow-hidden border border-zinc-800/80 p-0.5">
+                <div 
+                    class="h-full rounded-full transition-all duration-500 shadow-sm"
+                    :class="budgetPercentage > 100 ? 'bg-rose-500' : (budgetPercentage > 80 ? 'bg-amber-500' : 'bg-emerald-500')"
+                    :style="{ width: Math.min(budgetPercentage, 100) + '%' }"
+                ></div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 text-xs border-t border-zinc-800/60">
+                <div>
+                    <span class="text-zinc-500 block text-[10px]">Monthly Expenses</span>
+                    <span class="font-bold text-xs tracking-tight text-rose-400">₱{{ totalMonthlyExpense.toLocaleString() }}</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-zinc-500 block text-[10px]">Remaining Budget</span>
+                    <span class="font-bold text-xs tracking-tight text-white">₱{{ budgetRemaining.toLocaleString() }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Breakdown Analytics -->
+        <div class="card p-5 rounded-2xl space-y-3">
+            <span class="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">Spending Analytics ({{ selectedMonth }})</span>
+            
+            <div v-if="categoryAnalytics.length === 0" class="text-center py-3 text-zinc-500 text-xs">
+                No expenses recorded for this month.
+            </div>
+
+            <div v-else class="space-y-2.5">
+                <div v-for="cat in categoryAnalytics" :key="cat.name" class="space-y-1">
+                    <div class="flex justify-between text-xs">
+                        <span class="font-medium text-zinc-300">{{ cat.name }}</span>
+                        <span class="text-rose-400 font-bold">-₱{{ Math.abs(cat.amount).toLocaleString() }} ({{ cat.percentage }}%)</span>
+                    </div>
+                    <div class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800">
+                        <div class="h-full bg-rose-500 rounded-full transition-all duration-500" :style="{ width: cat.percentage + '%' }"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Savings Goals ("Ipon Tracker") -->
+        <div class="card p-5 rounded-2xl space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">Savings Goals ("Ipon")</span>
+                <button @click="openGoalModal = true" class="text-[10px] text-emerald-400 hover:underline font-bold">+ Add Goal</button>
+            </div>
+
+            <div v-if="savingsGoals.length === 0" class="text-center py-4 text-zinc-500 text-xs">
+                No savings goals set yet. Click "+ Add Goal".
+            </div>
+
+            <div class="space-y-3" v-else>
+                <div v-for="goal in savingsGoals" :key="goal.id" class="p-3 rounded-xl bg-zinc-900/50 border border-zinc-800 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-bold text-white">{{ goal.name }}</span>
+                        <span class="text-emerald-400 font-bold">₱{{ goal.current.toLocaleString() }} / ₱{{ goal.target.toLocaleString() }}</span>
+                    </div>
+                    <div class="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
+                        <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" :style="{ width: Math.min((goal.current / goal.target) * 100, 100) + '%' }"></div>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                        <span class="text-[10px] text-zinc-500">{{ Math.min(((goal.current / goal.target) * 100), 100).toFixed(0) }}% achieved</span>
+                        <div class="flex gap-1">
+                            <button @click="contributeGoal(goal.id, 500)" class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-emerald-400">+₱500</button>
+                            <button @click="deleteGoal(goal.id)" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-rose-500/20 text-[10px] text-zinc-500 hover:text-rose-400">✕</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Transaction Form -->
+        <div class="card p-5 rounded-2xl space-y-4">
+            <h3 class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">New Transaction</h3>
+            
+            <form @submit.prevent="onSubmit" class="space-y-3">
+                <div class="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs">
+                    <button 
+                        type="button" 
+                        @click="form.type = 'expense'"
+                        :class="form.type === 'expense' ? 'bg-zinc-800 text-rose-400 font-bold shadow-sm' : 'text-zinc-500'"
+                        class="py-1.5 rounded-lg transition"
+                    >
+                        Expense (-)
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="form.type = 'income'"
+                        :class="form.type === 'income' ? 'bg-zinc-800 text-emerald-400 font-bold shadow-sm' : 'text-zinc-500'"
+                        class="py-1.5 rounded-lg transition"
+                    >
+                        Income (+)
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-zinc-500 font-medium mb-1">Description</label>
+                        <input 
+                            type="text" 
+                            maxlength="40"
+                            v-model="form.text" 
+                            placeholder="e.g., Grocery..." 
+                            class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-zinc-500 font-medium mb-1">Wallet Source</label>
+                        <select 
+                            v-model="form.wallet" 
+                            class="w-full px-2 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none"
+                        >
+                            <option v-for="w in wallets" :key="w.id" :value="w.id">{{ w.name }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-zinc-500 font-medium mb-1">Category</label>
+                        <select 
+                            v-model="form.category" 
+                            class="w-full px-2 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none"
+                        >
+                            <option value="General">General</option>
+                            <option value="Food">Food & Drinks</option>
+                            <option value="Bills">Bills & Utilities</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Salary">Salary</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-zinc-500 font-medium mb-1">Amount (₱)</label>
+                        <input 
+                            type="text" 
+                            inputmode="decimal"
+                            maxlength="8"
+                            v-model="form.amount" 
+                            @input="form.amount = form.amount.replace(/[^0-9.]/g, '')"
+                            placeholder="0.00" 
+                            class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-zinc-500 font-medium mb-1">Date</label>
+                    <input 
+                        type="date" 
+                        v-model="form.date" 
+                        class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[11px] text-white focus:outline-none"
+                    />
+                </div>
+
+                <button class="w-full bg-white hover:bg-zinc-200 text-black font-bold py-2.5 rounded-xl text-xs shadow-md transition">
+                    Save Transaction
+                </button>
+            </form>
+        </div>
+
+        <!-- History -->
+        <div class="card p-5 rounded-2xl space-y-3">
+            <div class="flex justify-between items-center text-xs">
+                <span class="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">History ({{ selectedMonth }})</span>
+                <button @click="clearHistory" v-if="filteredTransactions.length > 0" class="text-zinc-500 hover:text-rose-400 text-[10px] font-medium">
+                    Clear Month
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <input 
+                    type="text" 
+                    v-model="searchQuery" 
+                    placeholder="Search keyword..." 
+                    class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white focus:outline-none placeholder-zinc-600"
+                />
+                <select 
+                    v-model="filterCategory" 
+                    class="w-full px-2 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 focus:outline-none"
+                >
+                    <option value="">All Categories</option>
+                    <option value="General">General</option>
+                    <option value="Food">Food</option>
+                    <option value="Bills">Bills</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Salary">Salary</option>
+                </select>
+            </div>
+            
+            <div v-if="filteredTransactions.length === 0" class="text-center py-6 text-zinc-600 text-xs">
+                No transactions found.
+            </div>
+
+            <ul class="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs">
+                <li 
+                    v-for="t in filteredTransactions" 
+                    :key="t.id"
+                    class="flex justify-between items-center p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700/80 transition"
+                >
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-white">{{ t.text }}</span>
+                            <span class="text-[9px] px-2 py-0.5 rounded-md font-medium border" :class="getCategoryBadgeClass(t.category)">
+                                {{ t.category || 'General' }}
+                            </span>
+                            <span class="text-[9px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700">
+                                {{ getWalletName(t.wallet) }}
+                            </span>
+                        </div>
+                        <span class="text-[10px] text-zinc-500 block">{{ t.date }}</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3">
+                        <span class="font-bold tracking-tight" :class="t.amount < 0 ? 'text-rose-400' : 'text-emerald-400'">
+                            {{ t.amount < 0 ? '-' : '+' }}₱{{ Math.abs(t.amount).toLocaleString() }}
+                        </span>
+                        <button @click="deleteTransaction(t.id)" class="text-zinc-600 hover:text-rose-400 p-1">
+                            ✕
+                        </button>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Goal Modal -->
+        <div v-if="openGoalModal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+            <div class="card p-6 rounded-2xl w-full max-w-sm space-y-4">
+                <h3 class="text-sm font-bold text-white">Add Savings Goal</h3>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block text-zinc-500 mb-1">Goal Name</label>
+                        <input type="text" v-model="newGoal.name" placeholder="e.g., Emergency Fund" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-zinc-500 mb-1">Target Amount (₱)</label>
+                        <input type="text" inputmode="decimal" v-model="newGoal.target" @input="newGoal.target = newGoal.target.replace(/[^0-9.]/g, '')" placeholder="10000" class="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none" />
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button @click="openGoalModal = false" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl text-xs font-bold">Cancel</button>
+                    <button @click="saveGoal" class="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black py-2 rounded-xl text-xs font-bold">Save Goal</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
